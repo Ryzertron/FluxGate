@@ -39,10 +39,6 @@ typedef unsigned long u_long;
 struct xps_listener_s;
 struct xps_connection_s;
 
-// Struct typedefs
-typedef struct xps_listener_s xps_listener_t;
-typedef struct xps_connection_s xps_connection_t;
-
 // Temporary declarations
 extern vec_void_t listeners;
 extern vec_void_t connections;

@@ -3,7 +3,6 @@
 
 #include "../xps.h"
 #include "xps_logger.h"
-#include "xps_utils.h"
 
 typedef struct xps_buffer_s {
   size_t size;

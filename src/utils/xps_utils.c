@@ -76,3 +76,13 @@ char *get_remote_ip(u_int sock_fd) {
 
   return ip_str;
 }
+
+// function to reverse a string in place
+void reverse_string(char *str) {
+  int len = strlen(str) - 1; // Exclude null terminator
+  for (int i = 0; i < len / 2; i++) {
+    char temp = str[i];
+    str[i] = str[len - i - 1];
+    str[len - i - 1] = temp;
+  }
+}

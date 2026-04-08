@@ -2,6 +2,7 @@
 #define XPS_UTILS_H
 
 #include "../xps.h"
+#include "xps_buffer.h"
 #include "xps_logger.h"
 
 // Sockets
@@ -11,5 +12,6 @@ struct addrinfo *xps_getaddrinfo(const char *host, u_int port);
 char *get_remote_ip(u_int sock_fd);
 
 // Other functions
+void reverse_string(char *str);
 
 #endif
