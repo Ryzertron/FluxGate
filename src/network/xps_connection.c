@@ -1,8 +1,12 @@
 #include "xps_connection.h"
 #include "../core/xps_core.h"
+#include <errno.h>
+#include <sys/epoll.h>
 
-// Forward declaration of read handler
+// Forward declaration of handlers
 void connection_read_handler(xps_connection_t *connection);
+void connection_write_handler(xps_connection_t *connection);
+void connection_close_handler(xps_connection_t *connection);
 
 // FUNCTION DEFINITIONS
 xps_connection_t *xps_connection_create(xps_core_t *core, u_int sock_fd) {
@@ -18,13 +22,16 @@ xps_connection_t *xps_connection_create(xps_core_t *core, u_int sock_fd) {
     return NULL;
   }
 
-  xps_loop_attach(core->loop, sock_fd, EPOLLIN, connection,
-                  (xps_handler_t)connection_read_handler);
+  xps_loop_attach(core->loop, sock_fd, EPOLLIN | EPOLLOUT, connection,
+                  (xps_handler_t)connection_read_handler,
+                  (xps_handler_t)connection_write_handler,
+                  (xps_handler_t)connection_close_handler);
 
   connection->core = core;
   connection->sock_fd = sock_fd;
   connection->listener = NULL;
   connection->remote_ip = get_remote_ip(sock_fd);
+  connection->write_buff_list = xps_buffer_list_create();
 
   vec_push(&core->connections, connection);
 
@@ -60,7 +67,7 @@ void connection_read_handler(xps_connection_t *connection) {
   assert(connection != NULL);
 
   // read data from client using recv into a buffer of size DEFAULT_BUFFER_SIZE
-  char buffer[DEFAULT_BUFFER_SIZE];
+  u_char *buffer = malloc(DEFAULT_BUFFER_SIZE * sizeof(u_char));
   long read_n = recv(connection->sock_fd, buffer, DEFAULT_BUFFER_SIZE - 1, 0);
 
   if (read_n < 0) {
@@ -80,20 +87,54 @@ void connection_read_handler(xps_connection_t *connection) {
 
   printf("Received data from %s: %s\n", connection->remote_ip, buffer);
 
-  reverse_string(buffer);
+  reverse_string((char *)buffer);
 
-  long sent_n = 0;
-  long message_len = read_n; // Since we null-terminated the buffer, we can use
-                             // read_n as the message length
-  while (sent_n < message_len) {
-    long write_n =
-        send(connection->sock_fd, buffer + sent_n, message_len - sent_n, 0);
-    if (write_n < 0) {
-      logger(LOG_ERROR, "xps_connection_read_handler()", "send() failed");
+  xps_buffer_t *write_buff =
+      xps_buffer_create(read_n + 1, read_n + 1, (u_char *)buffer);
+
+  xps_buffer_list_append(connection->write_buff_list, write_buff);
+  logger(LOG_DEBUG, "xps_connection_read_handler()",
+         "Appended %zu bytes to write buffer list", write_buff->len);
+}
+
+void connection_write_handler(xps_connection_t *connection) {
+  assert(connection != NULL);
+  if (connection->write_buff_list->len == 0) {
+    return;
+  }
+
+  while (1) {
+    xps_buffer_t *message = xps_buffer_list_read(
+        connection->write_buff_list, connection->write_buff_list->len);
+
+    if (message == NULL) {
+      logger(LOG_ERROR, "xps_connection_write_handler()",
+             "xps_buffer_list_read() failed");
+      return;
+    }
+    long sent_n = send(connection->sock_fd, message->data, message->len, 0);
+    if (sent_n < 0) {
+      if (errno == EAGAIN || errno == EWOULDBLOCK) {
+        logger(LOG_DEBUG, "xps_connection_write_handler()",
+               "No Buffer Space Available.");
+        return;
+      }
+      logger(LOG_ERROR, "xps_connection_write_handler()", "send() failed");
       perror("Error Message");
       xps_connection_destroy(connection);
       return;
     }
-    sent_n += write_n;
+    xps_buffer_list_clear(connection->write_buff_list, sent_n);
+
+    if (connection->write_buff_list->len <= 0) {
+      return;
+    }
   }
+}
+
+void connection_close_handler(xps_connection_t *connection) {
+  assert(connection != NULL);
+
+  xps_connection_destroy(connection);
+  logger(LOG_INFO, "xps_connection_close_handler()", "Peer closed connection");
 }

@@ -1,4 +1,5 @@
 #include "xps_buffer.h"
+#include "xps_utils.h"
 // xps_buffer
 
 xps_buffer_t *xps_buffer_create(size_t size, size_t len, u_char *data) {

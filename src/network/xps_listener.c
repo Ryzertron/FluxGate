@@ -68,7 +68,7 @@ xps_listener_t *xps_listener_create(xps_core_t *core, const char *host,
   listener->port = port;
 
   xps_loop_attach(core->loop, sock_fd, EPOLLIN, listener,
-                  (xps_handler_t)listener_connection_handler);
+                  (xps_handler_t)listener_connection_handler, NULL, NULL);
 
   vec_push(&core->listeners, listener);
 
@@ -116,6 +116,13 @@ void listener_connection_handler(xps_listener_t *listener) {
     logger(LOG_ERROR, "xps_listener_connection_handler()",
            "accept() failed on %s:%u", listener->host, listener->port);
     perror("Error Message");
+    return;
+  }
+
+  if (make_socket_non_blocking(conn_sock_fd) < 0) {
+    logger(LOG_ERROR, "xps_listener_connection_handler()",
+           "make_socket_non_blocking() failed");
+    close(conn_sock_fd);
     return;
   }
 

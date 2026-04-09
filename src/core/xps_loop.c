@@ -1,6 +1,8 @@
 #include "xps_loop.h"
 
-loop_event_t *loop_event_create(u_int fd, void *ptr, xps_handler_t read_cb) {
+loop_event_t *loop_event_create(u_int fd, void *ptr, xps_handler_t read_cb,
+                                xps_handler_t write_cb,
+                                xps_handler_t close_cb) {
   assert(ptr != NULL);
 
   loop_event_t *event = (loop_event_t *)malloc(sizeof(loop_event_t));
@@ -12,6 +14,8 @@ loop_event_t *loop_event_create(u_int fd, void *ptr, xps_handler_t read_cb) {
   event->fd = fd;
   event->ptr = ptr;
   event->read_cb = read_cb;
+  event->write_cb = write_cb;
+  event->close_cb = close_cb;
 
   logger(LOG_DEBUG, "loop_event_create()", "event created for fd %d", fd);
 
@@ -70,7 +74,8 @@ void xps_loop_destroy(xps_loop_t *loop) {
 }
 
 int xps_loop_attach(xps_loop_t *loop, u_int fd, int event_flags, void *ptr,
-                    xps_handler_t read_cb) {
+                    xps_handler_t read_cb, xps_handler_t write_cb,
+                    xps_handler_t close_cb) {
   assert(loop != NULL);
   assert(ptr != NULL);
   assert(read_cb != NULL);
@@ -78,7 +83,7 @@ int xps_loop_attach(xps_loop_t *loop, u_int fd, int event_flags, void *ptr,
   struct epoll_event event;
   event.data.fd = fd;
   event.events = event_flags;
-  event.data.ptr = loop_event_create(fd, ptr, read_cb);
+  event.data.ptr = loop_event_create(fd, ptr, read_cb, write_cb, close_cb);
 
   if (epoll_ctl(loop->epoll_fd, EPOLL_CTL_ADD, fd, &event) < 0) {
     logger(LOG_ERROR, "xps_loop_attach()", "epoll_ctl() failed to add fd %d",
@@ -150,17 +155,47 @@ void xps_loop_run(xps_loop_t *loop) {
         continue;
       }
 
+#define EVENT_VALID                                                            \
+  (curr_loop_event != NULL &&                                                  \
+   loop->events.data[curr_loop_event_idx] == curr_loop_event)
+
+      if (curr_epoll_event.events & (EPOLLERR | EPOLLHUP)) {
+        logger(LOG_DEBUG, "xps_loop_run()", "error event for fd %d",
+               curr_loop_event->fd);
+        if (curr_loop_event->close_cb != NULL) {
+          curr_loop_event->close_cb(curr_loop_event->ptr);
+        }
+      }
+
+      if (!EVENT_VALID) {
+        logger(LOG_DEBUG, "xps_loop_run()",
+               "event became invalid.  Skipping...");
+        continue;
+      }
+
       if (curr_epoll_event.events & EPOLLIN) {
         logger(LOG_DEBUG, "xps_loop_run()", "read event for fd %d",
                curr_loop_event->fd);
         if (curr_loop_event->read_cb != NULL) {
           curr_loop_event->read_cb(curr_loop_event->ptr);
-        } else {
-          logger(LOG_ERROR, "xps_loop_run()", "no read callback for fd %d",
-                 curr_loop_event->fd);
-          exit(E_FAIL);
         }
       }
+
+      if (!EVENT_VALID) {
+        logger(LOG_DEBUG, "xps_loop_run()",
+               "event became invalid.  Skipping...");
+        continue;
+      }
+
+      if (curr_epoll_event.events & EPOLLOUT) {
+        logger(LOG_DEBUG, "xps_loop_run()", "write event for fd %d",
+               curr_loop_event->fd);
+        if (curr_loop_event->write_cb != NULL) {
+          curr_loop_event->write_cb(curr_loop_event->ptr);
+        }
+      }
+
+#undef EVENT_VALID
     }
   }
 }

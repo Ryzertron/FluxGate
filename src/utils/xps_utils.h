@@ -12,5 +12,6 @@ char *get_remote_ip(u_int sock_fd);
 
 // Other functions
 void reverse_string(char *str);
+void vec_filter_null(vec_void_t *v);
 
 #endif
