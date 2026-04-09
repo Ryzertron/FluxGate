@@ -7,6 +7,8 @@
 void connection_read_handler(xps_connection_t *connection);
 void connection_write_handler(xps_connection_t *connection);
 void connection_close_handler(xps_connection_t *connection);
+void connection_loop_read_handler(xps_connection_t *connection);
+void connection_loop_write_handler(xps_connection_t *connection);
 
 // FUNCTION DEFINITIONS
 xps_connection_t *xps_connection_create(xps_core_t *core, u_int sock_fd) {
@@ -22,9 +24,9 @@ xps_connection_t *xps_connection_create(xps_core_t *core, u_int sock_fd) {
     return NULL;
   }
 
-  xps_loop_attach(core->loop, sock_fd, EPOLLIN | EPOLLOUT, connection,
-                  (xps_handler_t)connection_read_handler,
-                  (xps_handler_t)connection_write_handler,
+  xps_loop_attach(core->loop, sock_fd, EPOLLIN | EPOLLOUT | EPOLLET, connection,
+                  (xps_handler_t)connection_loop_read_handler,
+                  (xps_handler_t)connection_loop_write_handler,
                   (xps_handler_t)connection_close_handler);
 
   connection->core = core;
@@ -32,6 +34,10 @@ xps_connection_t *xps_connection_create(xps_core_t *core, u_int sock_fd) {
   connection->listener = NULL;
   connection->remote_ip = get_remote_ip(sock_fd);
   connection->write_buff_list = xps_buffer_list_create();
+  connection->read_ready = false;
+  connection->write_ready = false;
+  connection->send_handler = (xps_handler_t)connection_write_handler;
+  connection->recv_handler = (xps_handler_t)connection_read_handler;
 
   vec_push(&core->connections, connection);
 
@@ -71,10 +77,16 @@ void connection_read_handler(xps_connection_t *connection) {
   long read_n = recv(connection->sock_fd, buffer, DEFAULT_BUFFER_SIZE - 1, 0);
 
   if (read_n < 0) {
-    logger(LOG_ERROR, "xps_connection_read_handler()", "recv() failed");
-    perror("Error Message");
-    xps_connection_destroy(connection);
-    return;
+    if (errno == EAGAIN || errno == EWOULDBLOCK) {
+      connection->read_ready = false;
+      logger(LOG_DEBUG, "xps_connection_read_handler()",
+             "No Data Available. Retry later.");
+      return;
+    } else {
+      logger(LOG_ERROR, "xps_connection_read_handler()", "recv() failed");
+      xps_connection_destroy(connection);
+      return;
+    }
   }
 
   if (read_n == 0) {
@@ -93,13 +105,13 @@ void connection_read_handler(xps_connection_t *connection) {
       xps_buffer_create(read_n + 1, read_n + 1, (u_char *)buffer);
 
   xps_buffer_list_append(connection->write_buff_list, write_buff);
-  logger(LOG_DEBUG, "xps_connection_read_handler()",
-         "Appended %zu bytes to write buffer list", write_buff->len);
 }
 
 void connection_write_handler(xps_connection_t *connection) {
   assert(connection != NULL);
   if (connection->write_buff_list->len == 0) {
+    logger(LOG_DEBUG, "xps_connection_write_handler()",
+           "No data to send. Waiting for next write event.");
     return;
   }
 
@@ -112,15 +124,17 @@ void connection_write_handler(xps_connection_t *connection) {
              "xps_buffer_list_read() failed");
       return;
     }
+
     long sent_n = send(connection->sock_fd, message->data, message->len, 0);
-    if (sent_n < 0) {
+
+    if (sent_n == -1) {
       if (errno == EAGAIN || errno == EWOULDBLOCK) {
         logger(LOG_DEBUG, "xps_connection_write_handler()",
-               "No Buffer Space Available.");
+               "No Buffer Space Available. Retry later.");
+        connection->write_ready = false;
         return;
       }
       logger(LOG_ERROR, "xps_connection_write_handler()", "send() failed");
-      perror("Error Message");
       xps_connection_destroy(connection);
       return;
     }
@@ -137,4 +151,16 @@ void connection_close_handler(xps_connection_t *connection) {
 
   xps_connection_destroy(connection);
   logger(LOG_INFO, "xps_connection_close_handler()", "Peer closed connection");
+}
+
+void connection_loop_read_handler(xps_connection_t *connection) {
+  assert(connection != NULL);
+
+  connection->read_ready = true;
+}
+
+void connection_loop_write_handler(xps_connection_t *connection) {
+  assert(connection != NULL);
+
+  connection->write_ready = true;
 }
