@@ -1,7 +1,10 @@
 #ifndef XPS_LOGGER_H
 #define XPS_LOGGER_H
 
-#include "../xps.h"
+#include <stdarg.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 // Basic text colors
 #define BLACK_TEXT "\x1b[30m"

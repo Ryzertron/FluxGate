@@ -6,6 +6,7 @@
 #include <assert.h>
 #include <fcntl.h>
 #include <netdb.h>
+#include <signal.h>
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -20,6 +21,7 @@
 #define DEFAULT_BACKLOG 64
 #define MAX_EPOLL_EVENTS 32
 #define DEFAULT_BUFFER_SIZE 100000 // 100 KB
+#define DEFAULT_NULLS_THRESH 32
 
 // Error constants
 #define OK 0            // Success
@@ -34,17 +36,9 @@
 typedef unsigned char u_char;
 typedef unsigned int u_int;
 typedef unsigned long u_long;
+typedef void (*xps_handler_t)(void *ptr);
 
-// Structures
-struct xps_listener_s;
-struct xps_connection_s;
-
-// Temporary declarations
-extern vec_void_t listeners;
-extern vec_void_t connections;
-int xps_loop_create();
-void xps_loop_attach(int epoll_fd, int fd, int events);
-void xps_loop_detach(int epoll_fd, int fd);
-void xps_loop_run(int epoll_fd);
+// Utilities
+#include "utils/xps_logger.h"
 
 #endif

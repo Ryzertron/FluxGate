@@ -1,8 +1,13 @@
 #include "xps_connection.h"
+#include "../core/xps_core.h"
 
-xps_connection_t *xps_connection_create(int epoll_fd, int sock_fd) {
-  assert(epoll_fd >= 0);
+// Forward declaration of read handler
+void connection_read_handler(xps_connection_t *connection);
+
+// FUNCTION DEFINITIONS
+xps_connection_t *xps_connection_create(xps_core_t *core, u_int sock_fd) {
   assert(sock_fd >= 0);
+  assert(core != NULL);
 
   xps_connection_t *connection =
       (xps_connection_t *)malloc(sizeof(xps_connection_t));
@@ -13,14 +18,15 @@ xps_connection_t *xps_connection_create(int epoll_fd, int sock_fd) {
     return NULL;
   }
 
-  xps_loop_attach(epoll_fd, sock_fd, EPOLLIN);
+  xps_loop_attach(core->loop, sock_fd, EPOLLIN, connection,
+                  (xps_handler_t)connection_read_handler);
 
-  connection->epoll_fd = epoll_fd;
+  connection->core = core;
   connection->sock_fd = sock_fd;
   connection->listener = NULL;
   connection->remote_ip = get_remote_ip(sock_fd);
 
-  vec_push(&connections, connection);
+  vec_push(&core->connections, connection);
 
   logger(LOG_DEBUG, "xps_connection_create()", "Connection created");
 
@@ -30,6 +36,8 @@ xps_connection_t *xps_connection_create(int epoll_fd, int sock_fd) {
 void xps_connection_destroy(xps_connection_t *connection) {
   assert(connection != NULL);
 
+  vec_void_t connections = connection->core->connections;
+
   for (int i = 0; i < connections.length; i++) {
     xps_connection_t *curr = connections.data[i];
     if (curr == connection) {
@@ -38,7 +46,7 @@ void xps_connection_destroy(xps_connection_t *connection) {
     }
   }
 
-  xps_loop_detach(connection->epoll_fd, connection->sock_fd);
+  xps_loop_detach(connection->core->loop, connection->sock_fd);
 
   close(connection->sock_fd);
 
@@ -48,7 +56,7 @@ void xps_connection_destroy(xps_connection_t *connection) {
   logger(LOG_DEBUG, "xps_connection_destroy()", "Connection destroyed");
 }
 
-void xps_connection_read_handler(xps_connection_t *connection) {
+void connection_read_handler(xps_connection_t *connection) {
   assert(connection != NULL);
 
   // read data from client using recv into a buffer of size DEFAULT_BUFFER_SIZE
@@ -63,8 +71,7 @@ void xps_connection_read_handler(xps_connection_t *connection) {
   }
 
   if (read_n == 0) {
-    logger(LOG_DEBUG, "xps_connection_read_handler()",
-           "Peer closed connection");
+    logger(LOG_INFO, "xps_connection_read_handler()", "Peer closed connection");
     xps_connection_destroy(connection);
     return;
   }

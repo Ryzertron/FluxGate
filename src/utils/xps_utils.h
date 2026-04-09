@@ -3,7 +3,6 @@
 
 #include "../xps.h"
 #include "xps_buffer.h"
-#include "xps_logger.h"
 
 // Sockets
 bool is_valid_port(u_int port);

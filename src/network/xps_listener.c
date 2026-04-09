@@ -1,10 +1,11 @@
 #include "xps_listener.h"
+#include "../core/xps_core.h"
 #include "xps_connection.h"
-#include <asm-generic/socket.h>
-#include <stdlib.h>
-#include <sys/socket.h>
 
-xps_listener_t *xps_listener_create(int epoll_fd, const char *host,
+// Forward declaration of connection handler
+void listener_connection_handler(xps_listener_t *listener);
+
+xps_listener_t *xps_listener_create(xps_core_t *core, const char *host,
                                     u_int port) {
   assert(host != NULL);
   assert(is_valid_port(port));
@@ -61,14 +62,15 @@ xps_listener_t *xps_listener_create(int epoll_fd, const char *host,
     return NULL;
   }
 
-  listener->epoll_fd = epoll_fd;
+  listener->core = core;
   listener->sock_fd = sock_fd;
   listener->host = strdup(host);
   listener->port = port;
 
-  xps_loop_attach(epoll_fd, sock_fd, EPOLLIN);
+  xps_loop_attach(core->loop, sock_fd, EPOLLIN, listener,
+                  (xps_handler_t)listener_connection_handler);
 
-  vec_push(&listeners, listener);
+  vec_push(&core->listeners, listener);
 
   logger(LOG_DEBUG, "xps_listener_create()", "Listener created on %s:%u", host,
          port);
@@ -80,9 +82,11 @@ void xps_listener_destroy(xps_listener_t *listener) {
 
   assert(listener != NULL);
 
-  xps_loop_detach(listener->epoll_fd, listener->sock_fd);
+  xps_loop_detach(listener->core->loop, listener->sock_fd);
 
   // Set listener to NULL from global listeners vector
+  vec_void_t listeners = listener->core->listeners;
+
   for (int i = 0; i < listeners.length; i++) {
     xps_listener_t *curr = listeners.data[i];
     if (curr == listener) {
@@ -90,6 +94,7 @@ void xps_listener_destroy(xps_listener_t *listener) {
       break;
     }
   }
+
   close(listener->sock_fd);
 
   logger(LOG_DEBUG, "xps_listener_destroy()", "Listener destroyed on %s:%u",
@@ -98,7 +103,7 @@ void xps_listener_destroy(xps_listener_t *listener) {
   free(listener);
 }
 
-void xps_listener_connection_handler(xps_listener_t *listener) {
+void listener_connection_handler(xps_listener_t *listener) {
   assert(listener != NULL);
 
   struct sockaddr_in conn_addr;
@@ -114,16 +119,16 @@ void xps_listener_connection_handler(xps_listener_t *listener) {
     return;
   }
 
-  xps_connection_t *client =
-      xps_connection_create(listener->epoll_fd, conn_sock_fd);
+  xps_connection_t *connection =
+      xps_connection_create(listener->core, conn_sock_fd);
 
-  if (client == NULL) {
+  if (connection == NULL) {
     logger(LOG_ERROR, "xps_listener_connection_handler()",
            "xps_connection_create() failed");
     close(conn_sock_fd);
     return;
   }
 
-  client->listener = listener;
+  connection->listener = listener;
   logger(LOG_INFO, "xps_listener_connection_handler", "New Connection");
 }

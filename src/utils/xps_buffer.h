@@ -2,7 +2,6 @@
 #define XPS_BUFFER_H
 
 #include "../xps.h"
-#include "xps_logger.h"
 
 typedef struct xps_buffer_s {
   size_t size;
