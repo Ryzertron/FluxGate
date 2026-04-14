@@ -1,5 +1,6 @@
 #include "xps_listener.h"
 #include "../core/xps_core.h"
+#include "../core/xps_pipe.h"
 #include "xps_connection.h"
 
 // Forward declaration of connection handler
@@ -137,6 +138,14 @@ void listener_connection_handler(xps_listener_t *listener) {
       logger(LOG_ERROR, "xps_listener_connection_handler()",
              "xps_connection_create() failed");
       close(conn_sock_fd);
+      return;
+    }
+
+    xps_pipe_t *pipe = xps_pipe_create(listener->core, DEFAULT_PIPE_BUFF_THRESH,
+                                       connection->source, connection->sink);
+    if (pipe == NULL) {
+      logger(LOG_ERROR, "listener_connection_handler", "pipe creation failed");
+      xps_connection_destroy(connection);
       return;
     }
 
