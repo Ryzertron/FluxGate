@@ -6,6 +6,7 @@ gcc -g -o build/server.run \
   src/lib/vec/vec.c \
   src/network/xps_connection.c \
   src/network/xps_listener.c \
+  src/network/xps_upstream.c \
   src/core/xps_core.c \
   src/core/xps_loop.c \
   src/core/xps_pipe.c

@@ -3,6 +3,7 @@
 #include "../core/xps_loop.h"
 #include "../core/xps_pipe.h"
 #include "xps_connection.h"
+#include "xps_upstream.h"
 
 // Forward declaration of connection handler
 void listener_connection_handler(xps_listener_t *listener);
@@ -141,16 +142,52 @@ void listener_connection_handler(xps_listener_t *listener) {
       close(conn_sock_fd);
       return;
     }
+    connection->listener = listener;
 
-    xps_pipe_t *pipe = xps_pipe_create(listener->core, DEFAULT_PIPE_BUFF_THRESH,
-                                       connection->source, connection->sink);
-    if (pipe == NULL) {
-      logger(LOG_ERROR, "listener_connection_handler", "pipe creation failed");
-      xps_connection_destroy(connection);
-      return;
+    if (listener->port == 8001) {
+      xps_connection_t *upstream_conn =
+          xps_upstream_create(listener->core, "0.0.0.0", 3000);
+      if (upstream_conn == NULL) {
+        logger(LOG_ERROR, "xps_listener_connection_handler()",
+               "Failed to create upstream connection");
+        xps_connection_destroy(connection);
+        return;
+      }
+
+      xps_pipe_t *pipe =
+          xps_pipe_create(listener->core, DEFAULT_PIPE_BUFF_THRESH,
+                          connection->source, upstream_conn->sink);
+      if (pipe == NULL) {
+        logger(LOG_ERROR, "xps_listener_connection_handler()",
+               "pipe creation failed for upstream connection");
+        xps_connection_destroy(connection);
+        xps_connection_destroy(upstream_conn);
+        return;
+      }
+
+      pipe = xps_pipe_create(listener->core, DEFAULT_PIPE_BUFF_THRESH,
+                             upstream_conn->source, connection->sink);
+      if (pipe == NULL) {
+        logger(LOG_ERROR, "xps_listener_connection_handler()",
+               "pipe creation failed for upstream connection");
+        xps_connection_destroy(connection);
+        xps_connection_destroy(upstream_conn);
+        return;
+      }
+
+    } else {
+
+      xps_pipe_t *pipe =
+          xps_pipe_create(listener->core, DEFAULT_PIPE_BUFF_THRESH,
+                          connection->source, connection->sink);
+      if (pipe == NULL) {
+        logger(LOG_ERROR, "listener_connection_handler",
+               "pipe creation failed");
+        xps_connection_destroy(connection);
+        return;
+      }
     }
 
-    connection->listener = listener;
     logger(LOG_INFO, "xps_listener_connection_handler", "New Connection");
   }
 }

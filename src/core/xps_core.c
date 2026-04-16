@@ -76,7 +76,7 @@ void xps_core_start(xps_core_t *core) {
   assert(core != NULL);
 
   for (int port = 8001; port <= 8004; port++) {
-    xps_listener_t *listener = xps_listener_create(core, "127.0.0.1", port);
+    xps_listener_t *listener = xps_listener_create(core, "0.0.0.0", port);
 
     logger(LOG_INFO, "main()", "Server listening on port %d", port);
   }
