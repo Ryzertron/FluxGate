@@ -2,6 +2,7 @@
 #include "../core/xps_core.h"
 #include "../core/xps_loop.h"
 #include "../core/xps_pipe.h"
+#include "../disk/xps_file.h"
 #include "xps_connection.h"
 #include "xps_upstream.h"
 
@@ -174,6 +175,19 @@ void listener_connection_handler(xps_listener_t *listener) {
         xps_connection_destroy(upstream_conn);
         return;
       }
+
+    } else if (listener->port == 8002) {
+      int error;
+      xps_file_t *file =
+          xps_file_create(listener->core, "test/public/sample.txt", &error);
+      if (file == NULL) {
+        logger(LOG_ERROR, "xps_listener_connection_handler()",
+               "Failed to create file for index.html, error code: %d", error);
+        xps_connection_destroy(connection);
+        return;
+      }
+      xps_pipe_create(listener->core, DEFAULT_PIPE_BUFF_THRESH, file->source,
+                      connection->sink);
 
     } else {
 

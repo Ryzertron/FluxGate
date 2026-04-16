@@ -13,6 +13,7 @@
 #include <stdio.h>
 #include <sys/epoll.h>
 #include <sys/socket.h>
+#include <sys/stat.h>
 #include <unistd.h>
 
 // 3rd party libraries
