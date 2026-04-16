@@ -10,5 +10,6 @@ gcc -g -o build/server.run \
   src/core/xps_core.c \
   src/core/xps_loop.c \
   src/core/xps_pipe.c \
+  src/core/xps_session.c \
   src/disk/xps_file.c \
   src/disk/xps_mime.c

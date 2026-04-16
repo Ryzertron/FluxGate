@@ -2,6 +2,7 @@
 #include "../core/xps_core.h"
 #include "../core/xps_loop.h"
 #include "../core/xps_pipe.h"
+#include "../core/xps_session.h"
 #include "../disk/xps_file.h"
 #include "xps_connection.h"
 #include "xps_upstream.h"
@@ -145,61 +146,12 @@ void listener_connection_handler(xps_listener_t *listener) {
     }
     connection->listener = listener;
 
-    if (listener->port == 8001) {
-      xps_connection_t *upstream_conn =
-          xps_upstream_create(listener->core, "0.0.0.0", 3000);
-      if (upstream_conn == NULL) {
-        logger(LOG_ERROR, "xps_listener_connection_handler()",
-               "Failed to create upstream connection");
-        xps_connection_destroy(connection);
-        return;
-      }
-
-      xps_pipe_t *pipe =
-          xps_pipe_create(listener->core, DEFAULT_PIPE_BUFF_THRESH,
-                          connection->source, upstream_conn->sink);
-      if (pipe == NULL) {
-        logger(LOG_ERROR, "xps_listener_connection_handler()",
-               "pipe creation failed for upstream connection");
-        xps_connection_destroy(connection);
-        xps_connection_destroy(upstream_conn);
-        return;
-      }
-
-      pipe = xps_pipe_create(listener->core, DEFAULT_PIPE_BUFF_THRESH,
-                             upstream_conn->source, connection->sink);
-      if (pipe == NULL) {
-        logger(LOG_ERROR, "xps_listener_connection_handler()",
-               "pipe creation failed for upstream connection");
-        xps_connection_destroy(connection);
-        xps_connection_destroy(upstream_conn);
-        return;
-      }
-
-    } else if (listener->port == 8002) {
-      int error;
-      xps_file_t *file =
-          xps_file_create(listener->core, "test/public/sample.txt", &error);
-      if (file == NULL) {
-        logger(LOG_ERROR, "xps_listener_connection_handler()",
-               "Failed to create file for index.html, error code: %d", error);
-        xps_connection_destroy(connection);
-        return;
-      }
-      xps_pipe_create(listener->core, DEFAULT_PIPE_BUFF_THRESH, file->source,
-                      connection->sink);
-
-    } else {
-
-      xps_pipe_t *pipe =
-          xps_pipe_create(listener->core, DEFAULT_PIPE_BUFF_THRESH,
-                          connection->source, connection->sink);
-      if (pipe == NULL) {
-        logger(LOG_ERROR, "listener_connection_handler",
-               "pipe creation failed");
-        xps_connection_destroy(connection);
-        return;
-      }
+    xps_session_t *session = xps_session_create(listener->core, connection);
+    if (session == NULL) {
+      logger(LOG_ERROR, "xps_listener_connection_handler()",
+             "xps_session_create() failed for new connection");
+      xps_connection_destroy(connection);
+      return;
     }
 
     logger(LOG_INFO, "xps_listener_connection_handler", "New Connection");

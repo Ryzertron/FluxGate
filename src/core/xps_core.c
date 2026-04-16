@@ -3,6 +3,7 @@
 #include "../network/xps_listener.h"
 #include "xps_loop.h"
 #include "xps_pipe.h"
+#include "xps_session.h"
 
 xps_core_t *xps_core_create() {
 
@@ -22,10 +23,12 @@ xps_core_t *xps_core_create() {
   core->loop = loop;
   core->n_null_listeners = 0;
   core->n_null_connections = 0;
+  core->n_null_sessions = 0;
   core->n_null_pipes = 0;
   vec_init(&core->pipes);
   vec_init(&core->listeners);
   vec_init(&core->connections);
+  vec_init(&core->sessions);
 
   logger(LOG_DEBUG, "xps_core_create()", "core created");
 
@@ -54,7 +57,7 @@ void xps_core_destroy(xps_core_t *core) {
   for (int i = 0; i < core->pipes.length; i++) {
     xps_pipe_t *pipe = core->pipes.data[i];
     if (pipe != NULL) {
-      if (pipe->source != NULL) {
+      if (pipe->source) {
         xps_pipe_source_destroy(pipe->source);
       }
       if (pipe->sink) {
@@ -64,6 +67,14 @@ void xps_core_destroy(xps_core_t *core) {
     }
   }
   vec_deinit(&core->pipes);
+
+  for (int i = 0; i < core->sessions.length; i++) {
+    xps_session_t *session = core->sessions.data[i];
+    if (session != NULL) {
+      xps_session_destroy(session);
+    }
+  }
+  vec_deinit(&core->sessions);
 
   xps_loop_destroy(core->loop);
 
