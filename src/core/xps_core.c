@@ -1,4 +1,7 @@
 #include "xps_core.h"
+#include "../network/xps_connection.h"
+#include "../network/xps_listener.h"
+#include "xps_loop.h"
 #include "xps_pipe.h"
 
 xps_core_t *xps_core_create() {

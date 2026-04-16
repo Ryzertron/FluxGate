@@ -3,10 +3,11 @@
 
 #include "../utils/xps_utils.h"
 #include "../xps.h"
-#include "xps_listener.h"
 
 typedef struct xps_pipe_source_s xps_pipe_source_t;
 typedef struct xps_pipe_sink_s xps_pipe_sink_t;
+typedef struct xps_listener_s xps_listener_t;
+typedef struct xps_core_s xps_core_t;
 
 typedef struct xps_connection_s {
   xps_core_t *core;

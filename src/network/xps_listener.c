@@ -1,5 +1,6 @@
 #include "xps_listener.h"
 #include "../core/xps_core.h"
+#include "../core/xps_loop.h"
 #include "../core/xps_pipe.h"
 #include "xps_connection.h"
 

@@ -1,5 +1,6 @@
 #include "xps_connection.h"
 #include "../core/xps_core.h"
+#include "../core/xps_loop.h"
 #include "../core/xps_pipe.h"
 #include <asm-generic/errno-base.h>
 #include <asm-generic/errno.h>

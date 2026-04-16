@@ -1,7 +1,6 @@
 #ifndef XPS_PIPE_H
 #define XPS_PIPE_H
 
-#include "../utils/xps_buffer.h"
 #include "../utils/xps_utils.h"
 #include "../xps.h"
 

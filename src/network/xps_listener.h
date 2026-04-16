@@ -1,9 +1,10 @@
 #ifndef XPS_LISTENER_H
 #define XPS_LISTENER_H
 
-#include "../core/xps_loop.h"
 #include "../utils/xps_utils.h"
 #include "../xps.h"
+
+typedef struct xps_core_s xps_core_t;
 
 typedef struct xps_listener_s {
   xps_core_t *core;

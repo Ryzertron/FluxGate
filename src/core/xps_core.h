@@ -1,11 +1,8 @@
 #ifndef XPS_CORE_H
 #define XPS_CORE_H
 
-#include "../network/xps_connection.h"
-#include "../network/xps_listener.h"
 #include "../utils/xps_utils.h"
 #include "../xps.h"
-#include "xps_loop.h"
 
 typedef struct xps_loop_s xps_loop_t;
 
